@@ -74,7 +74,25 @@ def tokenize(text):
     
     return stemmed
 
+# Define performance metric for use in grid search scoring object
+def performance_metric(y_true, y_pred):
+    """Calculate median F1 score for all of the output classifiers
 
+        Args:
+        y_true: array. Array containing actual labels.
+        y_pred: array. Array containing predicted labels.
+
+        Returns:
+        score: float. Median F1 score for all of the output classifiers
+        """
+    f1_list = []
+    for i in range(np.shape(y_pred)[1]):
+        f1 = f1_score(np.array(y_true)[:, i], y_pred[:, i])
+        f1_list.append(f1)
+        
+    score = np.median(f1_list)
+    return score
+    
 def build_model():
     """Build a machine learning pipeline
     
@@ -82,8 +100,8 @@ def build_model():
     None
        
     Returns:
-    pipeline: pipeline object. Pipeline object that transforms the data and creates the 
-    model object.
+    cv: gridsearchcv object. Gridsearchcv object that transforms the data, creates the 
+    model object and finds the optimal model parameters.
     """
     # Create pipeline
     pipeline = Pipeline([
@@ -93,7 +111,18 @@ def build_model():
                                                              min_samples_split = 10)))
     ])
     
-    return pipeline
+    # Create parameters dictionary
+    parameters = {'vect__min_df': [1, 5],
+                  'tfidf__use_idf':[True, False],
+                  'clf__estimator__n_estimators':[10, 25], 
+                  'clf__estimator__min_samples_split':[2, 5, 10]}
+    
+    # Create scorer
+    scorer = make_scorer(performance_metric)
+    
+    # Create grid search object
+    cv = GridSearchCV(pipeline, param_grid = parameters, scoring = scorer, verbose = 10)
+    return cv
 
 
 def get_eval_metrics(actual, predicted, col_names):
@@ -156,7 +185,7 @@ def save_model(model, model_filepath):
     Returns:
     None
     """
-    pickle.dump(model, open(model_filepath, 'wb'))
+    pickle.dump(model.best_estimator_, open(model_filepath, 'wb'))
 
 def main():
     if len(sys.argv) == 3:
